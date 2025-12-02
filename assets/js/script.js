@@ -31,7 +31,7 @@ if (toggleBtn && problemPanel && solutionPanel) {
         if (showingSolution) {
             problemPanel.classList.add('hidden');
             solutionPanel.classList.add('active');
-            toggleBtn.textContent = 'Вернуться к Проблем';
+            toggleBtn.textContent = 'Вернуться к Проблемам';
         } else {
             problemPanel.classList.remove('hidden');
             solutionPanel.classList.remove('active');
@@ -48,10 +48,24 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
         const target = document.querySelector(targetId);
 
         if (target) {
-            target.scrollIntoView({
-                behavior: 'smooth',
-                block: 'start'
-            });
+            // if custom smooth is active, animate to offset; otherwise native
+            const container = document.querySelector('.scroll-container');
+            if (container && container.classList.contains('scroll-smooth-active')) {
+                const rect = target.getBoundingClientRect();
+                const containerRect = container.getBoundingClientRect();
+                const offset = rect.top - containerRect.top + container.scrollTop;
+                // set target for smooth system (exposed via window.__smoothScrollTarget if present)
+                if (window.__setSmoothTarget) {
+                    window.__setSmoothTarget(offset);
+                } else {
+                    container.scrollTo({ top: offset, behavior: 'smooth' });
+                }
+            } else {
+                target.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
         }
     });
 });
@@ -137,7 +151,7 @@ const teamMembers = [
         roleSecondary: 'Designer',
         skills: ['UI/UX Design', 'Python', 'HTML/CSS', 'JavaScript', 'Graphic Design', 'SQL', 'Linux Administration'],
         image: 'assets/images/team/farruh.png',
-        github: 'https://github.com/exfiltrix' // замени на реальный
+        github: 'https://progstyle.netlify.app/' // замени на реальный
     },
     {
         name: 'Сайдазимов Эмир-Саид Русланович',
@@ -151,7 +165,7 @@ const teamMembers = [
         name: 'Иброхимов Акмалхон Мирзохидович',
         rolePrimary: 'System',
         roleSecondary: 'Architect',
-        skills: ['Android (Kotlin, Java)', 'Jetpack Compose', 'MVVM', 'Clean Architecture', 'Hilt (DI)', 'Retrofit', 'Room', 'Paging3', 'Flow', 'LiveData', 'Coroutine', 'Firebase', 'Git', 'Python', 'SQL'],
+        skills: ['Android (Kotlin, Java)', 'Jetpack Compose', 'MVVM', 'Clean Architecture', 'Hilt (DI)', 'Retrofit', 'Room', 'Paging3', 'Flow', 'Python', 'SQL'],
         image: 'assets/images/team/akmal.png',
         github: 'https://github.com/AkmalkhonIbrokhimov' // замени на реальный
     }
@@ -303,46 +317,200 @@ chartBars.forEach(bar => {
     chartObserver.observe(bar);
 });
 
-// Enhanced scroll snap behavior for better control
+// ----------------- REPLACED: Enhanced scroll snap & wheel handling -----------------
+// Поведение прокрутки: теперь wheel слушается и на window, и на .scroll-container.
+// Обрабатываем wheel, клавиши и якоря; исключаем поля ввода и элементы с .no-smooth.
+// Простая сглаживающая анимация через RAF.
+
 const scrollContainer = document.querySelector('.scroll-container');
-let isScrolling;
 
-if (scrollContainer) {
-    scrollContainer.addEventListener('scroll', () => {
-        window.clearTimeout(isScrolling);
+(function setupSmoothForwarding() {
+    if (!scrollContainer) return;
 
-        isScrolling = setTimeout(() => {
-            const sections = document.querySelectorAll('.section-fullscreen');
-            const scrollTop = scrollContainer.scrollTop;
+    // Respect reduced motion preference
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        console.info('prefers-reduced-motion — используем нативный скролл');
+        return;
+    }
 
-            let closestSection = null;
-            let minDistance = Infinity;
+    // smoothing state
+    let target = scrollContainer.scrollTop;
+    let current = scrollContainer.scrollTop;
+    let rafId = null;
+    const EASE = 0.09;
+    const MAX_DELTA = 600;
 
-            sections.forEach(section => {
-                const sectionTop = section.offsetTop;
-                const distance = Math.abs(scrollTop - sectionTop);
+    function normalizeDelta(e) {
+        let delta = e.deltaY;
+        if (e.deltaMode === 1) delta *= 16;
+        else if (e.deltaMode === 2) delta *= window.innerHeight;
+        if (delta > MAX_DELTA) delta = MAX_DELTA;
+        if (delta < -MAX_DELTA) delta = -MAX_DELTA;
+        return delta;
+    }
 
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    closestSection = section;
-                }
+    function clampTarget() {
+        const max = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
+        if (target < 0) target = 0;
+        if (target > max) target = max;
+    }
+
+    function rafRender() {
+        current += (target - current) * EASE;
+        if (Math.abs(target - current) < 0.5) current = target;
+        scrollContainer.scrollTop = Math.round(current);
+        if (current !== target) {
+            rafId = requestAnimationFrame(rafRender);
+        } else {
+            rafId = null;
+        }
+    }
+
+    function startRAF() {
+        if (!rafId) rafId = requestAnimationFrame(rafRender);
+    }
+
+    function isInteractiveElement(node) {
+        if (!node) return false;
+        const tag = node.tagName;
+        if (!tag) return false;
+        const interactiveTags = ['INPUT', 'TEXTAREA', 'SELECT', 'DETAILS'];
+        if (interactiveTags.includes(tag)) return true;
+        if (node.isContentEditable) return true;
+        if (node.closest && node.closest('.no-smooth')) return true;
+        return false;
+    }
+
+    // main wheel handler — apply to container
+    function handleWheel(e) {
+        // do not interfere with native interactions
+        if (isInteractiveElement(e.target)) return;
+        if (scrollContainer.scrollHeight <= scrollContainer.clientHeight) return;
+
+        e.preventDefault();
+        const delta = normalizeDelta(e);
+        target += delta;
+        clampTarget();
+        startRAF();
+    }
+
+    // forward wheel events from window -> container
+    function onWindowWheel(e) {
+        // if target is interactive, ignore
+        if (isInteractiveElement(e.target)) return;
+
+        // If the pointer is inside an iframe or some other element, still forward
+        // We call the same handler but with the same event.
+        handleWheel(e);
+    }
+
+    // keyboard navigation (PageUp/PageDown/Home/End)
+    function onKeyDown(e) {
+        const active = document.activeElement;
+        if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) return;
+        if (scrollContainer.scrollHeight <= scrollContainer.clientHeight) return;
+
+        const page = scrollContainer.clientHeight * 0.9;
+        if (e.key === 'PageDown') { target += page; e.preventDefault(); }
+        else if (e.key === 'PageUp') { target -= page; e.preventDefault(); }
+        else if (e.key === 'End') { target = scrollContainer.scrollHeight - scrollContainer.clientHeight; e.preventDefault(); }
+        else if (e.key === 'Home') { target = 0; e.preventDefault(); }
+        else return;
+        clampTarget();
+        startRAF();
+    }
+
+    // anchor clicks inside document
+    function onDocumentClick(e) {
+        const a = e.target.closest && e.target.closest('a[href^="#"]');
+        if (!a) return;
+        const href = a.getAttribute('href');
+        if (!href || href === '#') return;
+        const id = href.slice(1);
+        const el = document.getElementById(id);
+        if (!el) return;
+        e.preventDefault();
+
+        const rect = el.getBoundingClientRect();
+        const containerRect = scrollContainer.getBoundingClientRect();
+        const offset = rect.top - containerRect.top + scrollContainer.scrollTop;
+        target = offset;
+        clampTarget();
+        startRAF();
+        history.pushState ? history.pushState(null, '', '#' + id) : (location.hash = '#' + id);
+    }
+
+    // touch handling: allow native scroll but sync target/current on end
+    scrollContainer.addEventListener('touchstart', () => { /* passive */ }, { passive: true });
+    scrollContainer.addEventListener('touchend', () => {
+        target = scrollContainer.scrollTop;
+        current = scrollContainer.scrollTop;
+        if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    });
+
+    // watch for DOM changes to update bounds
+    const mo = new MutationObserver(() => clampTarget());
+    mo.observe(scrollContainer, { childList: true, subtree: true, attributes: true });
+
+    // expose setter cleanup (optional)
+    window.__setSmoothTarget = function (val) {
+        if (typeof val === 'number') {
+            target = val;
+            clampTarget();
+            startRAF();
+        }
+    };
+
+    window.__smoothScrollCleanup = function () {
+        try {
+            scrollContainer.removeEventListener('wheel', handleWheel);
+            window.removeEventListener('wheel', onWindowWheel);
+            window.removeEventListener('keydown', onKeyDown);
+            document.removeEventListener('click', onDocumentClick);
+            mo.disconnect();
+            if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+            scrollContainer.classList.remove('scroll-smooth-active');
+            console.info('[smooth] cleanup done');
+        } catch (err) {
+            console.warn('[smooth] cleanup error', err);
+        }
+    };
+
+    // init bindings
+    scrollContainer.addEventListener('wheel', handleWheel, { passive: false });
+    window.addEventListener('wheel', onWindowWheel, { passive: false });
+    window.addEventListener('keydown', onKeyDown, { passive: false });
+    document.addEventListener('click', onDocumentClick);
+    window.addEventListener('resize', clampTarget, { passive: true });
+
+    // sync after images load
+    function waitImagesLoaded(timeout = 2000) {
+        const imgs = Array.from(scrollContainer.querySelectorAll('img'));
+        const pending = imgs.filter(i => !i.complete);
+        if (!pending.length) return Promise.resolve();
+        return new Promise(resolve => {
+            let done = 0;
+            pending.forEach(img => {
+                img.addEventListener('load', () => { done++; if (done === pending.length) resolve(); }, { once: true });
+                img.addEventListener('error', () => { done++; if (done === pending.length) resolve(); }, { once: true });
             });
+            setTimeout(resolve, timeout);
+        });
+    }
 
-            if (closestSection && minDistance > 50) {
-                closestSection.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'start'
-                });
-            }
-        }, 150);
-    }, false);
-}
+    waitImagesLoaded().then(() => {
+        target = scrollContainer.scrollTop;
+        current = scrollContainer.scrollTop;
+        scrollContainer.classList.add('scroll-smooth-active');
+    });
+})();
 
 // Prevent rapid scroll events from causing issues
 let lastScrollTime = 0;
 const scrollThrottle = 100; // milliseconds
 
 if (scrollContainer) {
+    // keep a lightweight throttle for any legacy handlers
     scrollContainer.addEventListener('wheel', () => {
         const now = Date.now();
         if (now - lastScrollTime < scrollThrottle) {
@@ -364,4 +532,3 @@ document.querySelectorAll('.tech__badge').forEach(badge => {
 });
 
 console.log('Fullscreen presentation website loaded successfully with animated team block and auto-rotation.');
-
