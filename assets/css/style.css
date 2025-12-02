@@ -890,7 +890,7 @@ body {
 }
 
 .team__container {
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
     width: 100%;
 }
@@ -1045,7 +1045,7 @@ body {
     background: rgba(102, 126, 234, 0.2);
     color: var(--white);
     padding: 0.45rem 1rem;
-    border-radius: 999px;
+    border-radius: 20px;
     font-size: 0.8rem;
     border: 1px solid rgba(102, 126, 234, 0.5);
 }
