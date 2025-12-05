@@ -179,5 +179,5 @@
 
 ### 1. Клонировать репозиторий:
 ```bash
-git clone https://github.com/USERNAME/focus-ai-mvp-demo.git
+git clone https://github.com/exfiltrix/focus.git
 
