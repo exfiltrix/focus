@@ -13,7 +13,7 @@
 
 <body>
     <header class="nav">
-        <div class="nav__inner">
+        <div class="nav__header-content">
             <a href="#hero" class="nav__logo">
                 F.O.C.U.S<span class="nav__logo-accent">AI</span>
             </a>
@@ -22,18 +22,17 @@
                 <span></span>
                 <span></span>
             </button>
-
-            <nav class="nav__links">
-                <a href="#problem-solution" class="nav__link">Проблема</a>
-                <a href="#why-us" class="nav__link">Почему мы</a>
-                <a href="#roadmap" class="nav__link">Roadmap</a>
-                <a href="#pricing" class="nav__link">Тарифы</a>
-                <a href="#expenses" class="nav__link">Расходы</a>
-                <a href="#demo" class="nav__link">Demo / MVP</a>
-                <a href="#team" class="nav__link">Команда</a>
-                <a href="#tech" class="nav__link">Tech</a>
-            </nav>
         </div>
+        <nav class="nav__links">
+            <a href="#problem-solution" class="nav__link">Проблема</a>
+            <a href="#why-us" class="nav__link">Почему мы</a>
+            <a href="#roadmap" class="nav__link">Roadmap</a>
+            <a href="#pricing" class="nav__link">Тарифы</a>
+            <a href="#expenses" class="nav__link">Расходы</a>
+            <a href="demo/index.html" class="nav__link nav__link--external">Demo / MVP →</a>
+            <a href="#team" class="nav__link">Команда</a>
+            <a href="#tech" class="nav__link">Tech</a>
+        </nav>
     </header>
     <main class="scroll-container">
         <!-- Hero Section -->
@@ -47,12 +46,14 @@
                         профессии до плана обучения, с учётом психотипа, навыков и рынка труда Узбекистана.
                     </p>
                     <div class="hero__cta">
-                        <a href="#demo" class="btn btn--primary">Посмотреть Демо</a>
+                        <a href="demo/index.html" class="btn btn--primary btn--external">Посмотреть Демо</a>
                         <a href="#why-us" class="btn btn--secondary">Узнать больше</a>
                     </div>
                 </div>
             </div>
         </section>
+
+
 
         <!-- Problem Solution Section -->
         <section id="problem-solution" class="problem-solution section-fullscreen">
@@ -455,6 +456,23 @@
     </main>
 
     <script src="assets/js/script.js" defer></script>
+    <script src="demo/assets/js/chatbot.js" defer></script>
+    <script>
+        // Initialize chatbot - try multiple times to ensure it loads
+        function initChatbot() {
+            if (window.FocusAssistant) {
+                window.FocusAssistant.init({ brand: 'F.O.C.U.S', accent: '#2563eb' });
+            } else {
+                // Retry if script hasn't loaded yet
+                setTimeout(initChatbot, 100);
+            }
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initChatbot);
+        } else {
+            initChatbot();
+        }
+    </script>
 </body>
 
 </html>

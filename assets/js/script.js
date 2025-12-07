@@ -17,6 +17,24 @@ if (navToggle && nav) {
     });
 }
 
+// ===== NAVBAR SCROLL EFFECT =====
+if (nav) {
+    let lastScroll = 0;
+    const scrollThreshold = 50;
+
+    window.addEventListener('scroll', () => {
+        const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
+
+        if (currentScroll > scrollThreshold) {
+            nav.classList.add('nav--scrolled');
+        } else {
+            nav.classList.remove('nav--scrolled');
+        }
+
+        lastScroll = currentScroll;
+    }, { passive: true });
+}
+
 
 // Problem-Solution Toggle
 const toggleBtn = document.getElementById('toggleBtn');
@@ -40,7 +58,7 @@ if (toggleBtn && problemPanel && solutionPanel) {
     });
 }
 
-// Smooth Scroll for CTA Links
+// Smooth Scroll for Navigation Links
 document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     anchor.addEventListener('click', function (e) {
         e.preventDefault();
@@ -48,24 +66,13 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
         const target = document.querySelector(targetId);
 
         if (target) {
-            // if custom smooth is active, animate to offset; otherwise native
-            const container = document.querySelector('.scroll-container');
-            if (container && container.classList.contains('scroll-smooth-active')) {
-                const rect = target.getBoundingClientRect();
-                const containerRect = container.getBoundingClientRect();
-                const offset = rect.top - containerRect.top + container.scrollTop;
-                // set target for smooth system (exposed via window.__smoothScrollTarget if present)
-                if (window.__setSmoothTarget) {
-                    window.__setSmoothTarget(offset);
-                } else {
-                    container.scrollTo({ top: offset, behavior: 'smooth' });
-                }
-            } else {
-                target.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'start'
-                });
-            }
+            const navHeight = 70;
+            const targetPosition = target.getBoundingClientRect().top + window.pageYOffset - navHeight;
+
+            window.scrollTo({
+                top: targetPosition,
+                behavior: 'smooth'
+            });
         }
     });
 });
@@ -81,6 +88,9 @@ const fadeInObserver = new IntersectionObserver((entries) => {
         if (entry.isIntersecting) {
             entry.target.style.opacity = '1';
             entry.target.style.transform = 'translateY(0)';
+        } else {
+            entry.target.style.opacity = '0';
+            entry.target.style.transform = 'translateY(30px)';
         }
     });
 }, observerOptions);
@@ -337,15 +347,18 @@ const scrollContainer = document.querySelector('.scroll-container');
     let target = scrollContainer.scrollTop;
     let current = scrollContainer.scrollTop;
     let rafId = null;
-    const EASE = 0.09;
-    const MAX_DELTA = 600;
+    const EASE = 0.06; // Reduced for smoother animation
+    const MAX_DELTA = 400; // Reduced for smoother scrolling
+    const MIN_DIFF = 0.1; // Smaller threshold for smoother stop
 
     function normalizeDelta(e) {
         let delta = e.deltaY;
         if (e.deltaMode === 1) delta *= 16;
         else if (e.deltaMode === 2) delta *= window.innerHeight;
-        if (delta > MAX_DELTA) delta = MAX_DELTA;
-        if (delta < -MAX_DELTA) delta = -MAX_DELTA;
+        // Apply smoother scaling for larger deltas
+        if (Math.abs(delta) > MAX_DELTA) {
+            delta = delta > 0 ? MAX_DELTA : -MAX_DELTA;
+        }
         return delta;
     }
 
@@ -355,13 +368,38 @@ const scrollContainer = document.querySelector('.scroll-container');
         if (target > max) target = max;
     }
 
+    // Smooth easing function (ease-out cubic)
+    function easeOutCubic(t) {
+        return 1 - Math.pow(1 - t, 3);
+    }
+
     function rafRender() {
-        current += (target - current) * EASE;
-        if (Math.abs(target - current) < 0.5) current = target;
+        const diff = target - current;
+        const absDiff = Math.abs(diff);
+
+        if (absDiff < MIN_DIFF) {
+            current = target;
+            scrollContainer.scrollTop = Math.round(current);
+            rafId = null;
+            return;
+        }
+
+        // Use adaptive easing - smoother when close to target
+        const distance = absDiff;
+        const maxDistance = scrollContainer.clientHeight;
+        const normalizedDistance = Math.min(distance / maxDistance, 1);
+
+        // Adaptive ease factor - slower when close to target
+        const adaptiveEase = EASE * (0.5 + 0.5 * normalizedDistance);
+
+        current += diff * adaptiveEase;
         scrollContainer.scrollTop = Math.round(current);
-        if (current !== target) {
+
+        if (Math.abs(target - current) >= MIN_DIFF) {
             rafId = requestAnimationFrame(rafRender);
         } else {
+            current = target;
+            scrollContainer.scrollTop = Math.round(current);
             rafId = null;
         }
     }
@@ -532,3 +570,77 @@ document.querySelectorAll('.tech__badge').forEach(badge => {
 });
 
 console.log('Fullscreen presentation website loaded successfully with animated team block and auto-rotation.');
+
+
+
+// Video Play and Animation on Scroll
+const videoIntroSection = document.getElementById('video-intro');
+const videoIntroContainer = document.querySelector('.video-intro__container');
+const introVideo = document.getElementById('introVideo');
+
+if (videoIntroSection && videoIntroContainer && introVideo) {
+    const videoObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                // Add class for animation
+                videoIntroContainer.classList.add('is-visible');
+
+                // Explicitly set muted to true (even if in HTML) and log its state
+                introVideo.muted = true;
+                console.log('Video muted state before play:', introVideo.muted);
+
+                // Ensure video is ready to play (enough data loaded)
+                if (introVideo.readyState >= 3) { // HAVE_FUTURE_DATA
+                    if (introVideo.paused) {
+                        introVideo.play().catch(error => {
+                            console.log("Autoplay prevented:", error);
+                        });
+                    }
+                } else {
+                    // If not enough data, wait for it
+                    introVideo.addEventListener('canplaythrough', function handler() {
+                        if (introVideo.paused) {
+                            introVideo.play().catch(error => {
+                                console.log("Autoplay prevented (after canplaythrough):", error);
+                            });
+                        }
+                        introVideo.removeEventListener('canplaythrough', handler);
+                    });
+                    introVideo.load(); // Try to force loading
+                }
+
+            } else {
+                // Remove class and pause video when out of view
+                videoIntroContainer.classList.remove('is-visible');
+                if (!introVideo.paused) {
+                    introVideo.pause();
+                }
+            }
+        });
+    }, { threshold: 0.5 }); // Trigger when 50% of the section is visible
+
+    videoObserver.observe(videoIntroSection);
+}
+
+// Highlight active roadmap step on scroll
+const roadmapSteps = document.querySelectorAll('.roadmap__step');
+
+const roadmapObserverOptions = {
+    root: null, // relative to the viewport
+    rootMargin: '0px 0px -50% 0px', // Trigger when step enters upper half of viewport
+    threshold: 0 // As soon as any part of the element enters the root
+};
+
+const roadmapObserver = new IntersectionObserver((entries, observer) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            entry.target.classList.add('roadmap__step--active');
+        } else {
+            entry.target.classList.remove('roadmap__step--active');
+        }
+    });
+}, roadmapObserverOptions);
+
+roadmapSteps.forEach(step => {
+    roadmapObserver.observe(step);
+});
