@@ -203,20 +203,11 @@ body::after {
     display: flex;
     flex-direction: row;
     align-items: center;
-    justify-content: space-between;
-    gap: 1.4rem;
-    flex: 1;
-    width: 100%;
-    margin: 0;
-    padding: 0 2rem;
-}
-
-.nav__links-center {
-    display: flex;
-    align-items: center;
     justify-content: center;
     gap: 1.4rem;
-    flex: 1;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
 }
 
 .nav__link {
@@ -584,6 +575,52 @@ body::after {
     background: var(--gradient-1);
     color: var(--white);
     box-shadow: var(--shadow-md);
+}
+
+/* Prototype CTA */
+.btn--prototype {
+    background: #1eb68b;
+    color: #0d0d0d;
+    box-shadow: 0 10px 24px rgba(30, 182, 139, 0.45);
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+}
+
+.btn--prototype::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.22), transparent 45%),
+        radial-gradient(circle at 80% 60%, rgba(255, 255, 255, 0.16), transparent 40%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: -1;
+}
+
+.btn--prototype {
+    animation: protoPulse 2.6s ease-in-out infinite;
+}
+
+.btn--prototype:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 14px 32px rgba(30, 182, 139, 0.55);
+}
+
+.btn--prototype:hover::before {
+    opacity: 1;
+}
+
+@keyframes protoPulse {
+
+    0%,
+    100% {
+        box-shadow: 0 10px 24px rgba(30, 182, 139, 0.45);
+    }
+
+    50% {
+        box-shadow: 0 12px 30px rgba(30, 182, 139, 0.62);
+    }
 }
 
 .btn--primary:hover {
@@ -1286,7 +1323,7 @@ body::after {
 
 .what-changed__grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 1.5rem;
     margin-top: 2rem;
 }
@@ -2755,6 +2792,11 @@ body::after {
 
 .video-intro__cta {
     white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 0.9rem 1.6rem;
 }
 
 @media (max-width: 768px) {
@@ -2805,6 +2847,7 @@ body::after {
     height: auto;
     max-height: 700px;
     object-fit: cover;
+    border: 3px solid #6DD39E;
     border-radius: 10px;
     /* Ensure the video fits within its container */
     transform: rotateX(90deg) translateY(50%);
